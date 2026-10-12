@@ -39,7 +39,7 @@ que la protege mientras evoluciona.
 |:---:|:---:|:---:|
 | ![Resumen](docs/capturas/resumen.png) | ![Inventario](docs/capturas/inventario.png) | ![Movimientos](docs/capturas/movimientos.png) |
 
-> _Añade las capturas siguiendo [`docs/capturas/README.md`](docs/capturas/README.md)._
+
 
 ---
 
