@@ -6,20 +6,176 @@
 ![Tests](https://img.shields.io/badge/tests-16%20passing-brightgreen)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
 
-Aplicación web para controlar el inventario de una tienda: qué productos hay, cuánto stock queda,
-qué entra y sale, y avisar cuando toca reponer. Sustituye la hoja de cálculo de siempre.
+> **El problema:** una tienda pequeña controla su stock en una hoja de cálculo.
+> Los números no cuadran, nadie sabe qué se vendió, y cuando hay que reponer
+> ya es tarde.
+>
+> **La solución:** una aplicación web que centraliza productos, controla cada
+> entrada y salida, y avisa de qué reponer de un vistazo.
+
+**Gestor de almacén** es una aplicación completa, de base de datos a interfaz,
+para llevar el inventario de una tienda. No es una demo de *todo clic*: tiene
+reglas de negocio reales, arquitectura pensada para crecer y una suite de tests
+que la protege mientras evoluciona.
+
+---
+
+## Índice
+
+- [Capturas](#capturas)
+- [Qué hace](#qué-hace)
+- [Decisiones técnicas](#decisiones-técnicas)
+- [Arquitectura](#arquitectura)
+- [Calidad](#calidad)
+- [Cómo ejecutarlo](#cómo-ejecutarlo)
+- [Referencia de la API](#referencia-de-la-api)
+- [Roadmap](#roadmap)
+
+---
 
 ## Capturas
 
 | Resumen | Inventario | Movimientos |
-|---|---|---|
-| Valor del inventario, unidades y reposiciones pendientes | CRUD con buscador, filtros y estados de stock | Registro de entradas/salidas con historial |
+|:---:|:---:|:---:|
+| ![Resumen](docs/capturas/resumen.png) | ![Inventario](docs/capturas/inventario.png) | ![Movimientos](docs/capturas/movimientos.png) |
 
-> Las capturas se añaden al desplegar (ver «Despliegue»).
+> _Añade las capturas siguiendo [`docs/capturas/README.md`](docs/capturas/README.md)._
+
+---
+
+## Qué hace
+
+### Controla el inventario, no una lista
+Alta, edición y borrado de productos con **SKU único**, categoría, cantidad,
+stock mínimo y precio de coste. Un producto no puede repetir SKU: la base de
+datos lo impide y la API lo devuelve con un `409` claro.
+
+### Registra cada movimiento
+Cada entrada (recepción) y salida (venta o rotura) queda registrada con fecha,
+motivo y producto. **El stock se ajusta en la misma transacción** que el
+registro: o se hace todo, o no se hace nada.
+
+### Nunca permite stock negativo
+Intentar vender más de lo que hay devuelve un error y **no toca el stock**:
+
+```json
+{ "error": "Solo hay 13 unidades de «Ratón inalámbrico» en stock" }
+```
+
+Es una regla de negocio en el servidor, no un `disabled` en el formulario. Un
+segundo cliente, un script o una recarga a mitad de petición no la saltan.
+
+### Avisa de qué reponer
+El resumen cruza cantidad y stock mínimo y lista lo que hay que pedir, con las
+unidades que faltan. Se filtra el inventario con un clic.
+
+### Mide el negocio
+Valor total del inventario a coste, unidades en almacén y desglose por
+categoría. Las cifras están en tipografía tabular para que las columnas se
+comparen de un vistazo.
+
+---
+
+## Decisiones técnicas
+
+_«Por qué» importa más que «con qué». Esto es lo que guió el proyecto._
+
+### Arquitectura en capas (backend)
+Una petición recorre `routes → services → repositories → db`. Las rutas solo
+traducen HTTP, los servicios aplican las reglas de negocio y los repositorios
+hablan SQL. **Ninguna capa conoce a la de más allá.**
+
+_Efecto práctico:_ migrar de SQLite a PostgreSQL es cambiar un módulo
+(`db/connection.js`) y traducir `schema.sql`. Services, rutas y frontend no se
+enteran.
+
+### SQL crudo con módulo nativo de Node
+`node:sqlite` en vez de un ORM: sin dependencias que compilar, sin caja negra
+y consultas que se leen tal cual. La contrapartida —escribir el SQL a mano— se
+mitiga con los tests.
+
+### Capa de datos aislada
+La conexión a BD vive en un único archivo y se inyecta mediante variable de
+entorno. Los tests corren sobre una base **en memoria** (`ALMACEN_DB=:memory:`):
+rápidas y sin tocar los datos reales.
+
+### Diseño con identidad propia
+Una paleta de «papel y tinta» con un único color de señal, esquinas rectas y
+filetes finos en lugar de tarjetas con sombra. **Todo el aspecto se controla
+desde `styles/tokens.css`**: cambiar la paleta entera es editar un archivo.
+
+### Frontend por features
+Una carpeta por pantalla (`dashboard/`, `productos/`, `movimientos/`) sobre
+capas compartidas (`api/`, `hooks/`, `components/`). Añadir una funcionalidad
+es repetir un patrón, no reinventar la estructura.
+
+---
+
+## Arquitectura
+
+```
+.
+├── backend/                  API REST (Node.js + Express + SQLite)
+│   ├── src/
+│   │   ├── server.js         Abre el puerto (lado de despliegue)
+│   │   ├── app.js            Construye Express (testable sin puerto)
+│   │   ├── db/
+│   │   │   ├── connection.js Único punto de acceso a la BD
+│   │   │   └── schema.sql    Esquema en SQL plano e idempotente
+│   │   ├── repositories/     SQL puro: leer/escribir tablas
+│   │   ├── services/         Reglas de negocio y transacciones
+│   │   ├── routes/           HTTP fino: parsea y llama al servicio
+│   │   └── lib/errors.js     AppError con código HTTP + asyncHandler
+│   ├── tests/                Tests con el runner nativo de Node
+│   └── data/almacen.db       BD (se crea sola; ignorada por git)
+└── frontend/                 Interfaz (React + Vite, proxy /api → backend)
+    └── src/
+        ├── api/              Un archivo por recurso; client.js centraliza fetch
+        ├── hooks/useApi.js   Estados de carga y error reutilizables
+        ├── components/       Piezas compartidas (raíl, campos, estados)
+        ├── features/         Una carpeta por pantalla
+        └── styles/           tokens.css + base/layout/components
+```
+
+**Flujo de una petición:**
+
+```
+HTTP ──▶ routes/index.js ──▶ services/*.service.js ──▶ repositories/*.repo.js ──▶ SQLite
+              ▲                       │
+         traduce HTTP          reglas de negocio      SQL parametrizado
+                                 (validación,
+                              stock negativo…)
+```
+
+---
+
+## Calidad
+
+| Área | Qué se ha hecho |
+|---|---|
+| **Tests** | 16 tests de servicios con el runner nativo de Node. Cubren validaciones, SKU único, «el stock nunca baja de 0», filtros y códigos 404/409. |
+| **Seguridad** | CORS restringido · SQL parametrizado (sin inyección) · salida escapada por React (sin XSS) · cabeceras `nosniff`, `X-Frame-Options`, `Referrer-Policy` · límite de cuerpo 200 kB · sin stack traces al cliente. |
+| **Accesibilidad** | Enlace «saltar al contenido» · `role="alert"` y `role="status"` para lectores de pantalla · foco visible · objetivos táctiles de 44 px · `prefers-reduced-motion`. |
+| **Rendimiento** | Lazy-loading por ruta · sin peticiones externas (funciona offline) · CSS y JS por debajo de 90 kB gzipped. |
+| **Robustez** | `ErrorBoundary` (una pantalla que falla no tumba la app) · estados de carga y vacíos en cada vista · mensajes de error en español. |
+| **SEO técnico** | `meta description` · Open Graph · `JSON-LD` · título dinámico por pantalla. |
+
+### Estructura de carpetas del frontend
+
+```
+src/
+├── api/            client.js · productos.js · movimientos.js · index.js
+├── hooks/          useApi.js
+├── components/     Rail · RailPie · EncabezadoPagina · Campo · Estado · Mensajes · ErrorBoundary · formato
+├── features/       dashboard/ · productos/ · movimientos/
+└── styles/         tokens.css · base.css · layout.css · components.css
+```
+
+---
 
 ## Cómo ejecutarlo
 
-Requisitos: [Node.js](https://nodejs.org) **22.5 o superior** (el backend usa el módulo nativo `node:sqlite`).
+Requisitos: [Node.js](https://nodejs.org) **22.5 o superior** (usa el módulo nativo `node:sqlite`).
 
 **Terminal 1 — backend** (puerto 3001):
 
@@ -40,74 +196,18 @@ npm run dev
 
 Abre <http://localhost:5173>.
 
-> **Windows / PowerShell**: si `npm` da un error de «ejecución de scripts deshabilitada», usa `npm.cmd`
-> en su lugar (es la política de ejecución de PowerShell).
-
-## Funcionalidades (MVP)
-
-- **CRUD de productos**: nombre, SKU (único), categoría, cantidad, stock mínimo y precio de coste.
-- **Movimientos de stock**: entrada (recepción) y salida (venta/rotura), con fecha y motivo.
-  El stock se ajusta en la misma transacción y nunca queda en negativo.
-- **Buscador y filtros**: por nombre/SKU, por categoría y «bajo mínimo / agotados» (enlazables por URL).
-- **Dashboard**: valor del inventario, unidades, reposiciones pendientes y valor por categoría.
-
-## Arquitectura
-
-Cada capa tiene una única responsabilidad y solo habla con la de al lado, lo que hace
-sencillo crecer o migrar el proyecto.
-
-```
-.
-├── backend/                  API REST (Node.js + Express + SQLite)
-│   ├── src/
-│   │   ├── server.js         Abre el puerto (lado de despliegue)
-│   │   ├── app.js            Construye Express (testable sin puerto)
-│   │   ├── db/
-│   │   │   ├── connection.js Único punto de acceso a la BD → migrar = cambiar este módulo
-│   │   │   └── schema.sql    Esquema en SQL plano e idempotente (sin DROP)
-│   │   ├── repositories/     SQL puro: leer/escribir tablas, sin reglas de negocio
-│   │   ├── services/         Reglas de negocio (stock no negativo, validaciones, transacciones)
-│   │   ├── routes/           HTTP fino: parsea la petición y llama al servicio
-│   │   └── lib/errors.js     AppError con código HTTP + asyncHandler
-│   ├── tests/                Tests de servicios con el runner nativo (npm test)
-│   └── data/almacen.db       Base de datos (se crea sola; ignorada por git)
-└── frontend/                 Interfaz (React + Vite, proxy /api → backend)
-    └── src/
-        ├── api/              Un archivo por recurso; client.js centraliza fetch/auth
-        ├── hooks/useApi.js   Estados de carga y error reutilizables
-        ├── components/       Piezas compartidas (raíl, campos, estados, formato)
-        ├── features/         Una carpeta por pantalla: dashboard, productos, movimientos
-        └── styles/           tokens.css (paleta y ritmo) + base/layout/components
-```
-
-**Flujo de una petición (backend):**
-`routes` → `services` (valida y aplica reglas) → `repositories` (SQL) → SQLite.
-Las rutas no tocan la base de datos y los servicios no saben Express: se pueden testear aislados.
+> **Windows / PowerShell:** si `npm` da un error de «ejecución de scripts deshabilitada», usa `npm.cmd`.
 
 ### Tests
 
 ```bash
 cd backend
-npm test     # 16 tests: validaciones, SKU único, stock nunca negativo, filtros, 404/409
+npm test
 ```
 
-Corren contra una base de datos en memoria (`ALMACEN_DB=:memory:`), sin tocar la real.
+---
 
-## Migrar SQLite → PostgreSQL
-
-1. Instala `pg` y crea un módulo de conexión equivalente a `backend/src/db/connection.js`.
-2. Traduce `backend/src/db/schema.sql` (los tipos casi no cambian: `datetime('now')` → `NOW()`).
-3. Los repositorios usan SQL crudo; si eliges un ORM (Prisma, Drizzle, Knex), solo cambian
-   los archivos de `repositories/`. Services, rutas y frontend no se enteran.
-
-## Añadir una funcionalidad nueva (ejemplo: proveedores)
-
-1. **Backend**: tabla nueva en `schema.sql` → `repositories/proveedores.repo.js` →
-   `services/proveedores.service.js` → ruta en `routes/index.js`.
-2. **Frontend**: `api/proveedores.js` → pantalla en `features/proveedores/` → enlace en `components/Rail.jsx`.
-3. **Tests**: `tests/proveedores.service.test.js`.
-
-## API
+## Referencia de la API
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -121,33 +221,52 @@ Corren contra una base de datos en memoria (`ALMACEN_DB=:memory:`), sin tocar la
 | GET | `/api/movimientos?producto_id=&tipo=` | Historial |
 | POST | `/api/movimientos` | `{ producto_id, tipo, cantidad, motivo }` |
 
-Errores: `400` validación · `404` no existe · `409` conflicto (SKU duplicado, stock insuficiente) ·
-`413` cuerpo demasiado grande. Todos en formato `{ "error": "mensaje" }`.
+**Errores:** `400` validación · `404` no existe · `409` conflicto (SKU duplicado, stock insuficiente) · `413` cuerpo demasiado grande. Todos en formato `{ "error": "mensaje" }`.
 
-## Seguridad
+### Variables de entorno
 
-- CORS restringido a orígenes configurados (`CORS_ORIGINS`).
-- Consultas parametrizadas (sin inyección SQL) y salida escapada por React (sin XSS).
-- Cabeceras: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
-- Límite de cuerpo de 200 kB y sin volcado de stack traces al cliente.
+| Variable | Descripción | Por defecto |
+|---|---|---|
+| `PORT` | Puerto del backend | `3001` |
+| `ALMACEN_DB` | Ruta del SQLite | `backend/data/almacen.db` |
+| `CORS_ORIGINS` | Orígenes permitidos, separados por coma | `http://localhost:5173` |
+| `VITE_API_URL` | URL de la API para el frontend en producción | (mismo origen) |
 
-## Despliegue
+### Despliegue
 
-- **Variables de entorno**: `PORT` (puerto del backend, por defecto 3001), `ALMACEN_DB` (ruta del SQLite),
-  `CORS_ORIGINS` (orígenes permitidos separados por coma).
-- **Frontend en producción**: `npm run build` genera `frontend/dist`; sirve esa carpeta con cualquier
-  servidor estático y apunta `VITE_API_URL` a la URL de la API si no está en el mismo dominio.
-- Los meta tags SEO y Open Graph están en `frontend/index.html` (ajusta `og:url` al dominio final).
+`npm run build` genera `frontend/dist`; sírvela con cualquier servidor estático
+y ajusta `og:url` en `frontend/index.html` al dominio final.
 
-## Roadmap (fase 2)
+---
 
+## Roadmap
+
+**Fase 2**
 - Proveedores y pedidos de reposición.
 - Varios almacenes o ubicaciones (pasillo/estante).
 - Lectura de códigos de barras con la cámara del móvil.
-- Usuarios con roles (admin / empleado) e histórico de «quién movió qué» + JWT.
+- Usuarios con roles (admin / empleado) + JWT e histórico de «quién movió qué».
 - Informes exportables a CSV/Excel con **Python** (pandas).
 - Migración a PostgreSQL.
 
+**Fase 3**
+- Alertas automáticas (email / webhook) al bajar del mínimo.
+- Predicción de reposición según rotación.
+- Recuento cíclico: stock teórico vs real.
+
+---
+
+## Extender el proyecto
+
+_En el código, añadir una funcionalidad (ejemplo: proveedores) es repetir un patrón:_
+
+1. **Backend:** tabla nueva en `schema.sql` → `repositories/proveedores.repo.js` →
+   `services/proveedores.service.js` → ruta en `routes/index.js`.
+2. **Frontend:** `api/proveedores.js` → pantalla en `features/proveedores/` → enlace en `components/Rail.jsx`.
+3. **Tests:** `tests/proveedores.service.test.js`.
+
+---
+
 ## Licencia
 
-MIT © 2026
+MIT © 2026 · [Ricardo Pinheiro](https://github.com/Portu142)
