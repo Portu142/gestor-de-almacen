@@ -1,0 +1,17 @@
+# Normaliza finales de línea: el repo guarda LF y Git los convierte al
+# detectar el sistema. Evita los avisos «LF will be replaced by CRLF».
+* text=auto eol=lf
+
+# Binarios: nunca se tocan
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+
+# La base de datos local no se versiona (por si acaso alguien la des-ignora)
+*.db        binary
+*.db-wal    binary
+*.db-shm    binary

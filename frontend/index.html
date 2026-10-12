@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#171310" />
+
+    <!-- SEO: herramienta interna → noindex deliberado. Al desplegarla públicamente,
+         elimina la línea robots. -->
+    <title>Gestor de almacén de tienda — inventario y reposiciones</title>
+    <meta
+      name="description"
+      content="Aplicación para controlar el inventario de una tienda: productos, stock mínimo, entradas y salidas, y aviso de qué reponer."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Open Graph: al compartir el enlace en chats o redes aparece con título
+         y descripción propios. Cambia og:url por la URL real al desplegar. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Gestor de almacén" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:title" content="Gestor de almacén de tienda — inventario y reposiciones" />
+    <meta
+      property="og:description"
+      content="Controla productos, stock mínimo, entradas y salidas, y sabe qué reponer de un vistazo."
+    />
+    <meta property="og:url" content="http://localhost:5173/" />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Dato estructurado mínimo (schema.org SoftwareApplication) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Gestor de almacén de tienda",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "es-ES"
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

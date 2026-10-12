@@ -1,0 +1,97 @@
+/* base.css — reset mínimo y tipografía global */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fuente);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+a { color: inherit; }
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* Números siempre alineados en columnas: en un almacén los datos se comparan. */
+td.num,
+th.num,
+.cifra-valor {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--fuente-num);
+}
+
+/* Foco visible y consistente: accesibilidad sin depender del ratón. */
+:focus-visible {
+  outline: 2px solid var(--senal);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: var(--senal);
+  color: #fff;
+}
+
+/* Utilidades de accesibilidad ---------- */
+/* Visible solo para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Enlace de salto: aparece con el foco de teclado, oculto para el ratón */
+.salto-contenido {
+  position: absolute;
+  top: -100px;
+  left: 1rem;
+  z-index: 100;
+  background: var(--tinta);
+  color: var(--superficie-alta);
+  padding: .6rem 1rem;
+  border-radius: var(--radio);
+  font-size: .85rem;
+  text-decoration: none;
+}
+
+.salto-contenido:focus { top: 1rem; }
+
+/* Objetivos táctiles generosos en pantallas con dedo (no con ratón) */
+@media (pointer: coarse) {
+  .boton {
+    min-height: 44px;
+    padding-top: .6rem;
+    padding-bottom: .6rem;
+  }
+
+  .boton--menudo {
+    min-height: 38px;
+    padding: .5rem .75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

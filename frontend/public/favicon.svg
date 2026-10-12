@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Monograma GA sobre caja de almacén: cuadrícula de embalaje + siglas -->
+  <rect width="32" height="32" fill="#171310"/>
+  <rect x="6" y="9" width="20" height="15" fill="none" stroke="#c93c11" stroke-width="2"/>
+  <path d="M6 14h20" stroke="#c93c11" stroke-width="2"/>
+  <path d="M16 9v5" stroke="#c93c11" stroke-width="2"/>
+</svg>
